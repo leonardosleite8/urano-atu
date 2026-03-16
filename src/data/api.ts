@@ -21,7 +21,7 @@ export async function apiSalvarCliente(cliente: Cliente): Promise<Cliente> {
   return cliente;
 }
 
-export async function apiExcluirCliente(id: string): Promise<void> {
+export async function apiExcluirCliente(): Promise<void> {
   // TODO: Supabase .delete('clientes').eq('id', id)
 }
 
@@ -37,6 +37,6 @@ export async function apiSalvarCard(card: KanbanCard): Promise<KanbanCard> {
   return card;
 }
 
-export async function apiExcluirCard(id: string): Promise<void> {
+export async function apiExcluirCard(): Promise<void> {
   // TODO: Supabase .delete('kanban_cards').eq('id', id)
 }

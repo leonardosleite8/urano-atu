@@ -169,8 +169,8 @@ export function ProgramacaoCompras() {
     const resultado = [...list];
     if (ordenacao) {
       resultado.sort((a, b) => {
-        const valA = (a as Record<string, unknown>)[ordenacao.coluna];
-        const valB = (b as Record<string, unknown>)[ordenacao.coluna];
+        const valA = (a as unknown as Record<string, unknown>)[ordenacao.coluna];
+        const valB = (b as unknown as Record<string, unknown>)[ordenacao.coluna];
         const numA = typeof valA === 'number' ? valA : parseFloat(String(valA ?? '').replace(',', '.'));
         const numB = typeof valB === 'number' ? valB : parseFloat(String(valB ?? '').replace(',', '.'));
         if (!Number.isNaN(numA) && !Number.isNaN(numB)) {

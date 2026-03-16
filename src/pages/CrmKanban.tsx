@@ -3,15 +3,12 @@ import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-p
 import { Plus, MessageSquare, X, FileDown, Paperclip, Trash2, GripVertical, CheckCircle } from 'lucide-react';
 import { formatarCNPJ } from '../utils/cnpj';
 import {
-  type KanbanCard,
   type KanbanColumn,
   type KanbanBoard,
   LINHAS_OPCOES,
   CANAIS_OPCOES,
   INMETRO_OPCOES,
   CREDENCIADA_OPCOES,
-  type Inmetro,
-  type Credenciada,
 } from '../types';
 import {
   getBoardsStorage,

@@ -7,7 +7,7 @@ import { downloadCsv } from '../utils/exportCsv';
 
 export function AgendaClientes() {
   const [clientes, setClientes] = useState<Cliente[]>(() => getClientesStorage());
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [clienteSelecionadoId, setClienteSelecionadoId] = useState<string | null>(() => {
