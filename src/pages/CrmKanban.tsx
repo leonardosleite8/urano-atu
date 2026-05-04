@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { Plus, MessageSquare, X, FileDown, Paperclip, Trash2, GripVertical, CheckCircle } from 'lucide-react';
 import { formatarCNPJ } from '../utils/cnpj';
@@ -20,11 +20,15 @@ import {
   setClientesStorage,
 } from '../data/storage';
 import { downloadCsv } from '../utils/exportCsv';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAudit } from '@/hooks/useAudit';
 
 const BOARD_COLUMNS_DROPPABLE = 'board-columns';
 const OPCOES_BALANCAS = ['BA37', 'B35', 'Urano Lab', 'UR 10.000', 'SM 300'];
 
 export function CrmKanban() {
+  const { user, permissions, viewScope, isMasterAdmin } = useAuth();
+  const { logAction } = useAudit();
   const [boards, setBoards] = useState<KanbanBoard[]>(() => getBoardsStorage());
   const [currentBoardId, setCurrentBoardId] = useState<string>(() => getBoardsStorage()[0]?.id ?? '');
   const [cards, setCards] = useState<any[]>(() => getCardsStorage());
@@ -72,6 +76,10 @@ export function CrmKanban() {
   useEffect(() => {
     setCardsStorage(cards);
   }, [cards]);
+
+  const canAdd = isMasterAdmin || !!permissions?.canAdd;
+  const canEdit = isMasterAdmin || !!permissions?.canEdit;
+  const canDelete = isMasterAdmin || !!permissions?.canDelete;
 
   const abrirNovo = (columnId: string) => {
     setCardEditando(null);
@@ -208,6 +216,8 @@ export function CrmKanban() {
   };
 
   const salvarCard = () => {
+    if (!canAdd && !cardEditando) return;
+    if (!canEdit && cardEditando) return;
     const payload: any = {
       id: (cardEditando?.id ?? `card-${Date.now()}`),
       boardId: (form.boardId ?? currentBoardId),
@@ -230,22 +240,45 @@ export function CrmKanban() {
     };
     if (cardEditando) {
       setCards((prev) => prev.map((c) => (c.id === cardEditando.id ? payload : c)));
+      void logAction(
+        'UPDATE',
+        `Atualizou card ${payload.id} - CNPJ ${payload.cnpj || '-'}`,
+        'kanban',
+      );
     } else {
       setCards((prev) => [...prev, payload]);
+      void logAction(
+        'CREATE',
+        `Criou card ${payload.id} - CNPJ ${payload.cnpj || '-'}`,
+        'kanban',
+      );
     }
     setModalAberto(false);
   };
 
   const excluirCard = () => {
+    if (!canDelete) return;
     if (!cardEditando) return;
     if (confirm('Tem certeza que deseja excluir este card? Esta ação não pode ser desfeita.')) {
       setCards((prev) => prev.filter((c) => c.id !== cardEditando.id));
+      void logAction(
+        'DELETE',
+        `Excluiu card ${cardEditando.id} - CNPJ ${cardEditando.cnpj || '-'}`,
+        'kanban',
+      );
       setModalAberto(false);
     }
   };
 
+  const cardsComEscopo = useMemo(() => {
+    if (viewScope === 'all' || !user) return cards;
+    const email = user.email?.toLowerCase() ?? '';
+    if (!email) return cards;
+    return cards.filter((c) => c.emailResponsavel?.toLowerCase?.() === email);
+  }, [cards, viewScope, user]);
+
   const cardsPorColuna = (columnId: string) =>
-    cards.filter((c) => c.boardId === currentBoardId && c.columnId === columnId);
+    cardsComEscopo.filter((c) => c.boardId === currentBoardId && c.columnId === columnId);
 
   const onDragEnd = (result: DropResult) => {
     const { source, destination, draggableId } = result;

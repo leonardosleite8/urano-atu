@@ -37,13 +37,11 @@ const SIGLAS_UF = new Set([
 interface Filtros {
   atividade: string;
   uf: string;
-  tempoAtividade: string;
 }
 
 const FILTROS_INICIAIS: Filtros = {
   atividade: '',
   uf: '',
-  tempoAtividade: '',
 };
 
 function normalizarTexto(valor: any): string {
@@ -166,7 +164,7 @@ export function AnalisePerfil() {
         r['Endereço Completo (Incluir Rua, CEP, Cidade, Bairro, UF)'] ?? '',
       );
       const ufExtraida = extrairUF(endereco);
-
+      const ufColuna = normalizarTexto(r['UF'] ?? '');
       const atividade = normalizarTexto(r['Qual tipo de atividade sua empresa faz?'] ?? '');
       const tempoAtividade = normalizarTexto(r['Tempo de atividade da empresa'] ?? '');
       const ipem = lerSimNao(r['Possui registro vigente no IPEM/INMETRO?']);
@@ -191,7 +189,7 @@ export function AnalisePerfil() {
       return {
         ...r,
         ATIVIDADE_URANO: atividade,
-        UF_URANO: ufExtraida,
+        UF_URANO: ufColuna || ufExtraida,
         TEMPO_ATIVIDADE_URANO: tempoAtividade,
         IPEM_URANO: ipem,
         SEDE_PROPRIA_URANO: sede,
@@ -211,7 +209,6 @@ export function AnalisePerfil() {
     return registrosEnriquecidos.filter((r) => {
       if (filtros.atividade && r.ATIVIDADE_URANO !== filtros.atividade) return false;
       if (filtros.uf && r.UF_URANO !== filtros.uf) return false;
-      if (filtros.tempoAtividade && r.TEMPO_ATIVIDADE_URANO !== filtros.tempoAtividade) return false;
       return true;
     });
   }, [registrosEnriquecidos, filtros]);
@@ -233,14 +230,55 @@ export function AnalisePerfil() {
     });
     return Array.from(set).sort();
   }, [registrosEnriquecidos]);
+  function parseTempoAtividadeMeses(texto: string): number {
+    const t = normalizarTexto(texto).toLowerCase();
+    if (!t) return 0;
+    let anos = 0;
+    let meses = 0;
 
-  const opcoesTempoAtividade = useMemo(() => {
-    const set = new Set<string>();
+    const matchAnos = t.match(/(\d+)\s*ano/);
+    if (matchAnos) {
+      anos = Number.parseInt(matchAnos[1], 10) || 0;
+    }
+
+    const matchMeses = t.match(/(\d+)\s*m[eê]s/);
+    if (matchMeses) {
+      meses = Number.parseInt(matchMeses[1], 10) || 0;
+    }
+
+    if (!matchAnos && !matchMeses) {
+      const numeroBruto = Number.parseInt(t.replace(/\D/g, ''), 10);
+      if (!Number.isNaN(numeroBruto)) {
+        anos = numeroBruto;
+      }
+    }
+
+    return anos * 12 + meses;
+  }
+
+  function formatarMediaTempo(mediaMeses: number): string {
+    const total = Math.round(mediaMeses);
+    const anos = Math.floor(total / 12);
+    const meses = total % 12;
+    const partes: string[] = [];
+    if (anos > 0) partes.push(`${anos} ano${anos > 1 ? 's' : ''}`);
+    if (meses > 0) partes.push(`${meses} mês${meses > 1 ? 'es' : ''}`);
+    if (partes.length === 0) return '0 meses';
+    return partes.join(' e ');
+  }
+
+  const mediaTempoAtividadeMeses = useMemo(() => {
+    if (registrosEnriquecidos.length === 0) return 0;
+    let soma = 0;
+    let cont = 0;
     registrosEnriquecidos.forEach((r) => {
-      const v = r.TEMPO_ATIVIDADE_URANO;
-      if (v) set.add(v);
+      const m = parseTempoAtividadeMeses(r.TEMPO_ATIVIDADE_URANO);
+      if (m > 0) {
+        soma += m;
+        cont += 1;
+      }
     });
-    return Array.from(set).sort();
+    return cont > 0 ? soma / cont : 0;
   }, [registrosEnriquecidos]);
 
   function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -459,7 +497,7 @@ export function AnalisePerfil() {
             Filtros do perfil
           </h2>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-semibold text-gray-600 uppercase">
               Atividade
@@ -492,25 +530,6 @@ export function AnalisePerfil() {
               ))}
             </select>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-gray-600 uppercase">
-              Tempo de atividade
-            </label>
-            <select
-              value={filtros.tempoAtividade}
-              onChange={(e) =>
-                setFiltros((f) => ({ ...f, tempoAtividade: e.target.value }))
-              }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#CC0000] focus:outline-none focus:ring-1 focus:ring-[#CC0000]"
-            >
-              <option value="">Todos</option>
-              {opcoesTempoAtividade.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
         <div className="mt-4 flex justify-end">
           <button
@@ -526,8 +545,8 @@ export function AnalisePerfil() {
 
       {mostrarDashboard && (
         <div className="space-y-6">
-          {/* KPIs no topo: Empresas Lidas, Presença Digital %, Caminhão %, Total Bancadas */}
-          <div className="grid gap-4 md:grid-cols-4">
+          {/* KPIs no topo: Empresas Lidas, Presença Digital %, Caminhão %, Total Bancadas, Tempo médio de atividade */}
+          <div className="grid gap-4 md:grid-cols-5">
             <div className="flex items-center gap-3 rounded-lg bg-white p-4 shadow">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#CC0000]/10 text-[#CC0000]">
                 <Building2 className="h-4 w-4" />
@@ -566,6 +585,19 @@ export function AnalisePerfil() {
               <div>
                 <p className="text-xs font-semibold uppercase text-gray-500">Total de Bancadas</p>
                 <p className="text-xl font-bold text-urano-gray-dark">{totalBancadas}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg bg-white p-4 shadow">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0055A4]/10 text-[#0055A4]">
+                <Activity className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase text-gray-500">
+                  Tempo médio de atividade
+                </p>
+                <p className="text-sm font-bold text-urano-gray-dark">
+                  {formatarMediaTempo(mediaTempoAtividadeMeses)}
+                </p>
               </div>
             </div>
           </div>

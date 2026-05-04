@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 // @ts-ignore - tipos xlsx podem não estar instalados
 import * as XLSX from 'xlsx';
 import { FileUp, Package, AlertTriangle, ShoppingCart, MinusCircle, CheckCircle, ArrowUp, ArrowDown } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAudit } from '@/hooks/useAudit';
 
 /** Chaves exatas da planilha (com possíveis espaços). */
 const COLS = {
@@ -145,6 +147,8 @@ function pecaContemProduto(produtoRaw: string, produtoSelecionado: string): bool
 }
 
 export function ProgramacaoCompras() {
+  const { permissions, isMasterAdmin } = useAuth();
+  const { logAction } = useAudit();
   const [itens, setItens] = useState<ItemEstoque[]>([]);
   const [busca, setBusca] = useState('');
   const [filtroProduto, setFiltroProduto] = useState('');
@@ -229,6 +233,8 @@ export function ProgramacaoCompras() {
   }, [itensFiltrados]);
 
   function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const podeCarregar = isMasterAdmin || !!permissions?.canAdd;
+    if (!podeCarregar) return;
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -240,6 +246,11 @@ export function ProgramacaoCompras() {
       const sheet = wb.Sheets[first];
       const raw: RegistroBruto[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
       setItens(raw.map((r) => mapearLinha(r)));
+      void logAction(
+        'CREATE',
+        `Importou planilha de programação de compras com ${raw.length} linhas`,
+        'programacao-compras',
+      );
       setBusca('');
       setFiltroProduto('');
       setFiltroStatus('');

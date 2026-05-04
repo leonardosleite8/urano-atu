@@ -4,8 +4,12 @@ import { formatarCNPJ } from '../utils/cnpj';
 import { CLASSIFICACAO_OPCOES, type Cliente, type Classificacao, type HistoricoEmpresa } from '../types';
 import { getClientesStorage, setClientesStorage, getCardsStorage } from '../data/storage';
 import { downloadCsv } from '../utils/exportCsv';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAudit } from '@/hooks/useAudit';
 
 export function AgendaClientes() {
+  const { user, permissions, viewScope, isMasterAdmin } = useAuth();
+  const { logAction } = useAudit();
   const [clientes, setClientes] = useState<Cliente[]>(() => getClientesStorage());
   const [loading] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
@@ -39,7 +43,12 @@ export function AgendaClientes() {
     }
   }, [clienteSelecionadoId, clientes]);
 
+  const canAdd = isMasterAdmin || !!permissions?.canAdd;
+  const canEdit = isMasterAdmin || !!permissions?.canEdit;
+  const canDelete = isMasterAdmin || !!permissions?.canDelete;
+
   const abrirNovo = () => {
+    if (!canAdd) return;
     setEditandoId(null);
     setForm({
       nomeEmpresa: '',
@@ -58,6 +67,7 @@ export function AgendaClientes() {
   };
 
   const abrirEditar = (c: Cliente) => {
+    if (!canEdit) return;
     setEditandoId(c.id);
     setForm({
       ...c,
@@ -78,6 +88,8 @@ export function AgendaClientes() {
   };
 
   const salvar = () => {
+    if (!canAdd && !editandoId) return;
+    if (!canEdit && editandoId) return;
     if (!form.cnpj || form.cnpj.length < 14) return;
     const payload: Cliente = {
       id: editandoId ?? `id-${Date.now()}`,
@@ -96,14 +108,35 @@ export function AgendaClientes() {
     };
     if (editandoId) {
       setClientes((prev) => prev.map((c) => (c.id === editandoId ? payload : c)));
+      void logAction(
+        'UPDATE',
+        `Atualizou cliente ${payload.razaoSocial} - CNPJ ${formatarCNPJ(payload.cnpj)}`,
+        'agenda',
+      );
     } else {
       setClientes((prev) => [...prev, payload]);
+      void logAction(
+        'CREATE',
+        `Criou cliente ${payload.razaoSocial} - CNPJ ${formatarCNPJ(payload.cnpj)}`,
+        'agenda',
+      );
     }
     setModalAberto(false);
   };
 
   const excluir = (id: string) => {
-    if (window.confirm('Excluir este cliente?')) setClientes((prev) => prev.filter((c) => c.id !== id));
+    if (!canDelete) return;
+    if (window.confirm('Excluir este cliente?')) {
+      const alvo = clientes.find((c) => c.id === id);
+      if (alvo) {
+        void logAction(
+          'DELETE',
+          `Excluiu cliente ${alvo.razaoSocial} - CNPJ ${formatarCNPJ(alvo.cnpj)}`,
+          'agenda',
+        );
+      }
+      setClientes((prev) => prev.filter((c) => c.id !== id));
+    }
   };
 
   const exportarCsv = () => {
@@ -127,9 +160,16 @@ export function AgendaClientes() {
     downloadCsv(headers, rows, 'agenda-clientes.csv');
   };
 
+  const clientesComEscopo = useMemo(() => {
+    if (viewScope === 'all' || !user) return clientes;
+    const email = user.email?.toLowerCase() ?? '';
+    if (!email) return clientes;
+    return clientes.filter((c) => c.email?.toLowerCase?.() === email);
+  }, [clientes, viewScope, user]);
+
   const clienteSelecionado = useMemo(
-    () => clientes.find((c) => c.id === clienteSelecionadoId) ?? null,
-    [clientes, clienteSelecionadoId]
+    () => clientesComEscopo.find((c) => c.id === clienteSelecionadoId) ?? null,
+    [clientesComEscopo, clienteSelecionadoId]
   );
 
   const ticketsDoCliente = useMemo(() => {

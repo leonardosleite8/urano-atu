@@ -6,6 +6,7 @@ import { CrmKanban } from '@/pages/CrmKanban';
 import { Dashboard } from '@/pages/Dashboard';
 import { AnalisePerfil } from '@/pages/AnalisePerfil';
 import { ProgramacaoCompras } from '@/pages/ProgramacaoCompras';
+import { AdminPainel } from '@/pages/AdminPainel';
 import { Login } from '@/pages/Login';
 import { Signup } from '@/pages/Signup';
 
@@ -27,6 +28,7 @@ function App() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="analise-perfil" element={<AnalisePerfil />} />
         <Route path="programacao-compras" element={<ProgramacaoCompras />} />
+        <Route path="admin" element={<AdminPainel />} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
